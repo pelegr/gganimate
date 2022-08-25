@@ -305,7 +305,7 @@ draw_frames <- function(plot, frames, device, ref_frame, ...) {
 
   void <- future_mapply(frames, files, seq_along(frames), FUN = function(frame, file, i, stream, ..., plot, dims, pb = NULL) {
     if (!stream){
-      device(files[i], ...)
+      device(file, ...)
       on.exit(dev.off())
     }
 
