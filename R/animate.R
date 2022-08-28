@@ -251,6 +251,7 @@ prerender <- function(plot, nframes) {
   plot <- set_nframes(plot, nframes)
   ggplot_build(plot)
 }
+
 # Draw each frame as an image based on a specified device
 # Returns a data.frame of frame metadata with image location in frame_source
 # column
@@ -303,29 +304,32 @@ draw_frames <- function(plot, frames, device, ref_frame, ...) {
   start <- Sys.time()
   pb$tick(0)
 
-  void <- future_mapply(frames, files, seq_along(frames), FUN = function(frame, file, i, stream, ..., plot, dims, pb = NULL) {
-    if (!stream){
-      device(file, ...)
-      on.exit(dev.off())
-    }
+  # Futures based processing of frames.
+  future_mapply(frames, files, seq_along(frames),
+                FUN = function(frame, file, i, stream, ..., plot, dims, pb = NULL) {
 
-    tryCatch(
-      plot$scene$plot_frame(plot, frame, widths = dims$widths, heights = dims$heights),
-      error = function(e) {
-        warning(conditionMessage(e), call. = FALSE)
-      }
-    )
-    if (!is.null(pb)) {
-      rate <- i/as.double(Sys.time() - start, units = 'secs')
-      if (is.nan(rate)) rate <- 0
-      rate <- format(rate, digits = 2)
-      pb$tick(tokens = list(fps = rate))
+                  if (!stream) {
+                    device(file)
+                    on.exit(dev.off())
+                  }
 
-      if (!stream) dev.off()
-    }
-  },
-  MoreArgs = list(stream = stream, ..., plot = plot, dims = dims, pb = pb),
-  SIMPLIFY = FALSE, USE.NAMES = FALSE)
+                  tryCatch(
+                    plot$scene$plot_frame(plot, frame, widths = dims$widths, heights = dims$heights),
+                    error = function(e) {
+                      warning(conditionMessage(e), call. = FALSE)
+                    }
+                  )
+
+                  if (!is.null(pb)) {
+                    rate <- i / as.double(Sys.time() - start, units = 'secs')
+                    if (is.nan(rate)) rate <- 0
+                    rate <- format(rate, digits = 2)
+                    pb$tick(tokens = list(fps = rate))
+                  }
+
+                },
+                MoreArgs = list(stream = stream, ..., plot = plot, dims = dims, pb = pb),
+                SIMPLIFY = FALSE)
 
   frame_vars <- plot$scene$frame_vars[frames, , drop = FALSE]
   if (!stream) frame_vars$frame_source <- files
